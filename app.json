@@ -1,0 +1,21 @@
+{
+  "expo": {
+    "name": "Clinic Booking",
+    "slug": "clinic-booking",
+    "scheme": "clinicbooking",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "android": {
+      "package": "com.clinic.booking"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-secure-store",
+      "expo-video"
+    ],
+    "experiments": {
+      "typedRoutes": false
+    }
+  }
+}
