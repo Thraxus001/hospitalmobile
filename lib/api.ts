@@ -26,6 +26,7 @@ export async function api<T = unknown>(
     method: opts.body ? (opts.method ?? "POST") : (opts.method ?? "GET"),
     headers: {
       "Content-Type": "application/json",
+      "ngrok-skip-browser-warning": "true",
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
     },
     body: opts.body ? JSON.stringify(opts.body) : undefined,

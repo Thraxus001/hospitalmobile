@@ -1,4 +1,4 @@
-import { View, Text, Pressable, StatusBar, ScrollView, Image } from "react-native";
+import { View, Text, Pressable, StatusBar, ScrollView, TouchableOpacity } from "react-native";
 import { useRouter } from "expo-router";
 
 export default function LabResults() {
@@ -102,9 +102,10 @@ export default function LabResults() {
           </View>
         ))}
 
-        <Pressable
+        <TouchableOpacity
           onPress={() => router.back()}
-          style={({ pressed }) => ({
+          activeOpacity={0.7}
+          style={{
             marginTop: 24,
             height: 50,
             borderRadius: 14,
@@ -113,13 +114,12 @@ export default function LabResults() {
             alignItems: "center",
             justifyContent: "center",
             paddingHorizontal: 32,
-            opacity: pressed ? 0.7 : 1,
-          })}
+          }}
         >
           <Text style={{ color: "#7c3aed", fontWeight: "700", fontSize: 15 }}>
             ← Back to Home
           </Text>
-        </Pressable>
+        </TouchableOpacity>
       </ScrollView>
     </View>
   );

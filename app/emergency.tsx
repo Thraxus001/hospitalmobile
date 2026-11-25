@@ -6,6 +6,7 @@ import {
   ScrollView,
   Linking,
   Alert,
+  TouchableOpacity,
 } from "react-native";
 import { useRouter } from "expo-router";
 
@@ -104,10 +105,11 @@ export default function Emergency() {
           Emergency contacts
         </Text>
         {EMERGENCY_LINES.map((line) => (
-          <Pressable
+          <TouchableOpacity
             key={line.number}
             onPress={() => call(line.number)}
-            style={({ pressed }) => ({
+            activeOpacity={0.75}
+            style={{
               flexDirection: "row",
               alignItems: "center",
               justifyContent: "space-between",
@@ -117,8 +119,7 @@ export default function Emergency() {
               marginBottom: 10,
               borderWidth: 1.5,
               borderColor: "#fee2e2",
-              opacity: pressed ? 0.75 : 1,
-            })}
+            }}
           >
             <View style={{ flex: 1 }}>
               <Text style={{ fontWeight: "700", fontSize: 15, color: "#0f172a" }}>
@@ -140,7 +141,7 @@ export default function Emergency() {
                 Call
               </Text>
             </View>
-          </Pressable>
+          </TouchableOpacity>
         ))}
 
         {/* Book urgent appointment */}
@@ -163,26 +164,26 @@ export default function Emergency() {
         >
           Need urgent care?
         </Text>
-        <Pressable
+        <TouchableOpacity
           onPress={() => router.push("/find-doctor")}
-          style={({ pressed }) => ({
+          activeOpacity={0.85}
+          style={{
             height: 56,
             borderRadius: 16,
             backgroundColor: "#dc2626",
             alignItems: "center",
             justifyContent: "center",
-            opacity: pressed ? 0.85 : 1,
             shadowColor: "#dc2626",
             shadowOffset: { width: 0, height: 6 },
             shadowOpacity: 0.35,
             shadowRadius: 12,
             elevation: 6,
-          })}
+          }}
         >
           <Text style={{ color: "#fff", fontWeight: "800", fontSize: 16 }}>
             Book an Urgent Appointment
           </Text>
-        </Pressable>
+        </TouchableOpacity>
 
         <Pressable
           onPress={() => router.back()}

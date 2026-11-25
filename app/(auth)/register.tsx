@@ -8,9 +8,11 @@ import {
   StatusBar,
   Text,
   TextInput,
+  TouchableOpacity,
   View,
 } from "react-native";
 import { Link } from "expo-router";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAuth } from "../../lib/auth";
 
 type Field = { name: string; phone: string; email: string; password: string };
@@ -91,6 +93,7 @@ function InputField({
 
 export default function Register() {
   const { register } = useAuth();
+  const insets = useSafeAreaInsets();
   const [f, setF] = useState<Field>({
     name: "",
     phone: "",
@@ -117,19 +120,20 @@ export default function Register() {
 
   return (
     <KeyboardAvoidingView
-      style={{ flex: 1, backgroundColor: "#f8fafc" }}
-      behavior={Platform.OS === "ios" ? "padding" : "height"}
+      style={{ flex: 1, backgroundColor: "#ffffff" }}
+      behavior={Platform.OS === "ios" ? "padding" : undefined}
     >
-      <StatusBar barStyle="dark-content" />
+      <StatusBar barStyle="light-content" />
       <ScrollView
-        contentContainerStyle={{ flexGrow: 1 }}
+        style={{ flex: 1, backgroundColor: "#ffffff" }}
+        contentContainerStyle={{ flexGrow: 1, paddingBottom: 16 }}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
         {/* Top banner */}
         <View
           style={{
-            height: 180,
+            height: 150,
             backgroundColor: "#065f46",
             alignItems: "center",
             justifyContent: "flex-end",
@@ -160,13 +164,8 @@ export default function Register() {
             borderTopRightRadius: 28,
             marginTop: -20,
             paddingHorizontal: 24,
-            paddingTop: 32,
-            paddingBottom: 40,
-            shadowColor: "#000",
-            shadowOffset: { width: 0, height: -4 },
-            shadowOpacity: 0.06,
-            shadowRadius: 16,
-            elevation: 10,
+            paddingTop: 28,
+            paddingBottom: 12,
           }}
         >
           <InputField
@@ -199,57 +198,67 @@ export default function Register() {
             secureTextEntry
             autoCapitalize="none"
           />
-
-          {/* Submit */}
-          <Pressable
-            onPress={submit}
-            disabled={!canSubmit}
-            style={({ pressed }) => ({
-              height: 54,
-              borderRadius: 16,
-              backgroundColor: canSubmit ? "#059669" : "#d1fae5",
-              alignItems: "center",
-              justifyContent: "center",
-              opacity: pressed ? 0.88 : 1,
-              marginTop: 8,
-              shadowColor: "#059669",
-              shadowOffset: { width: 0, height: 6 },
-              shadowOpacity: canSubmit ? 0.35 : 0,
-              shadowRadius: 12,
-              elevation: canSubmit ? 6 : 0,
-            })}
-          >
-            <Text
-              style={{
-                color: canSubmit ? "#fff" : "#6ee7b7",
-                fontWeight: "800",
-                fontSize: 16,
-              }}
-            >
-              {busy ? "Creating account…" : "Create account"}
-            </Text>
-          </Pressable>
-
-          <View
-            style={{
-              marginTop: 24,
-              flexDirection: "row",
-              justifyContent: "center",
-            }}
-          >
-            <Text style={{ color: "#64748b", fontSize: 15 }}>
-              Have an account?{" "}
-            </Text>
-            <Link href="/(auth)/login">
-              <Text
-                style={{ color: "#059669", fontWeight: "700", fontSize: 15 }}
-              >
-                Sign in
-              </Text>
-            </Link>
-          </View>
         </View>
       </ScrollView>
+
+      {/* Pinned bottom action bar — always visible while typing */}
+      <View
+        style={{
+          backgroundColor: "#ffffff",
+          borderTopWidth: 1,
+          borderTopColor: "#f1f5f9",
+          paddingHorizontal: 24,
+          paddingTop: 12,
+          paddingBottom: Math.max(insets.bottom, 16),
+        }}
+      >
+        <TouchableOpacity
+          onPress={submit}
+          disabled={!canSubmit}
+          activeOpacity={0.85}
+          style={{
+            height: 54,
+            borderRadius: 16,
+            backgroundColor: canSubmit ? "#059669" : "#94a3b8",
+            alignItems: "center",
+            justifyContent: "center",
+            shadowColor: "#059669",
+            shadowOffset: { width: 0, height: 6 },
+            shadowOpacity: canSubmit ? 0.3 : 0,
+            shadowRadius: 12,
+            elevation: canSubmit ? 6 : 0,
+          }}
+        >
+          <Text
+            style={{
+              color: "#ffffff",
+              fontWeight: "800",
+              fontSize: 16,
+            }}
+          >
+            {busy ? "Creating account…" : "Create account"}
+          </Text>
+        </TouchableOpacity>
+
+        <View
+          style={{
+            marginTop: 14,
+            flexDirection: "row",
+            justifyContent: "center",
+          }}
+        >
+          <Text style={{ color: "#64748b", fontSize: 14 }}>
+            Have an account?{" "}
+          </Text>
+          <Link href="/(auth)/login">
+            <Text
+              style={{ color: "#059669", fontWeight: "700", fontSize: 14 }}
+            >
+              Sign in
+            </Text>
+          </Link>
+        </View>
+      </View>
     </KeyboardAvoidingView>
   );
 }

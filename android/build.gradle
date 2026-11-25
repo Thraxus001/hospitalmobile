@@ -32,6 +32,9 @@ allprojects {
     maven { url 'https://www.jitpack.io' }
   }
 }
+subprojects {
+    buildDir = "C:/temp/clinic-android-build/${project.name}"
+}
 
 apply plugin: "expo-root-project"
 apply plugin: "com.facebook.react.rootproject"

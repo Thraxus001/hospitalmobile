@@ -7,6 +7,8 @@ import {
   StatusBar,
   Text,
   TextInput,
+  TouchableOpacity,
+  useWindowDimensions,
   View,
 } from "react-native";
 import { useRouter } from "expo-router";
@@ -14,6 +16,7 @@ import { api } from "../../lib/api";
 import type { Department } from "../../lib/types";
 import { useAuth } from "../../lib/auth";
 import { getDepartmentImage } from "../../lib/departmentImages";
+import DoctorDashboard from "../../components/DoctorDashboard";
 
 // Department background colours keyed by department name
 const DEPT_BG: Record<string, string> = {
@@ -74,9 +77,26 @@ const FEATURES = [
   },
 ];
 
+function chunkPairs<T>(items: T[]): [T, T | null][] {
+  const rows: [T, T | null][] = [];
+  for (let i = 0; i < items.length; i += 2) {
+    rows.push([items[i], items[i + 1] ?? null]);
+  }
+  return rows;
+}
+
 export default function Home() {
   const router = useRouter();
   const { user } = useAuth();
+  const { width: screenWidth } = useWindowDimensions();
+
+  if (user?.role === "doctor") {
+    return <DoctorDashboard />;
+  }
+
+  const GRID_GAP = 12;
+  const halfCardWidth = Math.max(120, Math.floor((screenWidth - 40 - GRID_GAP) / 2));
+
   const [q, setQ] = useState("");
   const [departments, setDepartments] = useState<Department[] | null>(null);
   const [error, setError] = useState("");
@@ -185,44 +205,46 @@ export default function Home() {
 
         {/* ── Banner image card ── */}
         <View style={{ marginHorizontal: 20, marginTop: -40 }}>
-          <Pressable
+          <TouchableOpacity
             onPress={() => router.push("/find-doctor")}
-            style={({ pressed }) => ({
+            activeOpacity={0.9}
+            style={{
               borderRadius: 20,
-              overflow: "hidden",
+              backgroundColor: "#0369a1",
               shadowColor: "#000",
               shadowOffset: { width: 0, height: 8 },
               shadowOpacity: 0.18,
               shadowRadius: 20,
-              elevation: 12,
-              opacity: pressed ? 0.9 : 1,
-            })}
+              elevation: 10,
+            }}
           >
-            <Image
-              source={require("../../assets/doctor-banner.png")}
-              style={{ width: "100%", height: 160, backgroundColor: "#0369a1" }}
-              resizeMode="cover"
-            />
-            <View
-              style={{
-                position: "absolute",
-                top: 0,
-                left: 0,
-                right: 0,
-                bottom: 0,
-                backgroundColor: "#0369a1bb",
-                padding: 20,
-                justifyContent: "flex-end",
-              }}
-            >
-              <Text style={{ color: "#fff", fontWeight: "800", fontSize: 18 }}>
-                Book a Specialist Today
-              </Text>
-              <Text style={{ color: "#bae6fd", fontSize: 13, marginTop: 4 }}>
-                Find verified doctors · Flexible slots · Tap to browse →
-              </Text>
+            <View style={{ borderRadius: 20, overflow: "hidden" }}>
+              <Image
+                source={require("../../assets/doctor-banner.png")}
+                style={{ width: "100%", height: 160, backgroundColor: "#0369a1" }}
+                resizeMode="cover"
+              />
+              <View
+                style={{
+                  position: "absolute",
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  backgroundColor: "#0369a1bb",
+                  padding: 20,
+                  justifyContent: "flex-end",
+                }}
+              >
+                <Text style={{ color: "#fff", fontWeight: "800", fontSize: 18 }}>
+                  Book a Specialist Today
+                </Text>
+                <Text style={{ color: "#bae6fd", fontSize: 13, marginTop: 4 }}>
+                  Find verified doctors · Flexible slots · Tap to browse →
+                </Text>
+              </View>
             </View>
-          </Pressable>
+          </TouchableOpacity>
         </View>
 
         {/* ── Quick Access ── */}
@@ -251,44 +273,64 @@ export default function Home() {
             </Pressable>
           </View>
 
-          <View
-            style={{
-              flexDirection: "row",
-              flexWrap: "wrap",
-              gap: 10,
-            }}
-          >
-            {FEATURES.map((f) => (
-              <Pressable
-                key={f.label}
-                onPress={() => router.push(f.route)}
-                style={({ pressed }) => ({
-                  width: "48%",
-                  backgroundColor: f.color,
-                  borderRadius: 16,
-                  padding: 16,
-                  opacity: pressed ? 0.8 : 1,
-                  gap: 4,
-                  borderWidth: 1,
-                  borderColor: "rgba(0,0,0,0.03)",
-                })}
+          <View style={{ gap: GRID_GAP }}>
+            {chunkPairs(FEATURES).map(([left, right], rowIdx) => (
+              <View
+                key={rowIdx}
+                style={{
+                  flexDirection: "row",
+                  justifyContent: "space-between",
+                  alignItems: "stretch",
+                }}
               >
-                <Text
-                  style={{
-                    fontSize: 14,
-                    fontWeight: "800",
-                    color: f.text,
-                    lineHeight: 18,
-                  }}
-                >
-                  {f.label}
-                </Text>
-                <Text
-                  style={{ fontSize: 11, color: "#64748b", fontWeight: "500" }}
-                >
-                  {f.description}
-                </Text>
-              </Pressable>
+                {[left, right].map((f, colIdx) =>
+                  f ? (
+                    <TouchableOpacity
+                      key={f.label}
+                      onPress={() => router.push(f.route)}
+                      activeOpacity={0.82}
+                      style={{
+                        width: halfCardWidth,
+                        minHeight: 92,
+                        justifyContent: "space-between",
+                        backgroundColor: f.color,
+                        borderRadius: 16,
+                        padding: 16,
+                        borderWidth: 1,
+                        borderColor: "rgba(15, 23, 42, 0.06)",
+                        shadowColor: "#000",
+                        shadowOffset: { width: 0, height: 1 },
+                        shadowOpacity: 0.04,
+                        shadowRadius: 4,
+                        elevation: 1,
+                      }}
+                    >
+                      <Text
+                        style={{
+                          fontSize: 14,
+                          fontWeight: "800",
+                          color: f.text,
+                          lineHeight: 19,
+                        }}
+                      >
+                        {f.label}
+                      </Text>
+                      <Text
+                        style={{
+                          fontSize: 11,
+                          color: "#64748b",
+                          fontWeight: "500",
+                          marginTop: 6,
+                        }}
+                      >
+                        {f.description}
+                      </Text>
+                    </TouchableOpacity>
+                  ) : (
+                    <View key={`empty-f-${colIdx}`} style={{ width: halfCardWidth }} />
+                  )
+                )}
+              </View>
             ))}
           </View>
         </View>
@@ -303,7 +345,7 @@ export default function Home() {
               marginBottom: 14,
             }}
           >
-            <View>
+            <View style={{ flex: 1, paddingRight: 12 }}>
               <Text style={{ fontSize: 17, fontWeight: "800", color: "#0f172a" }}>
                 Departments
               </Text>
@@ -312,7 +354,7 @@ export default function Home() {
               </Text>
             </View>
             {departments && (
-              <Text style={{ fontSize: 13, color: "#64748b" }}>
+              <Text style={{ fontSize: 13, color: "#64748b", fontWeight: "600" }}>
                 {departments.length} total
               </Text>
             )}
@@ -368,88 +410,89 @@ export default function Home() {
               </Pressable>
             </View>
           ) : (
-            <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 12 }}>
-              {filtered.map((dept) => {
-                const bg = DEPT_BG[dept.name] ?? "#f8fafc";
-                const accent = DEPT_ACCENT[dept.name] ?? "#64748b";
-                const deptImg = getDepartmentImage(dept.name);
-                return (
-                  <Pressable
-                    key={dept.id}
-                    onPress={() =>
-                      router.push(
-                        `/department/${encodeURIComponent(dept.name)}`
-                      )
+            <View style={{ gap: GRID_GAP }}>
+              {chunkPairs(filtered).map(([left, right], rowIdx) => (
+                <View
+                  key={rowIdx}
+                  style={{
+                    flexDirection: "row",
+                    justifyContent: "space-between",
+                    alignItems: "stretch",
+                  }}
+                >
+                  {[left, right].map((dept, colIdx) => {
+                    if (!dept) {
+                      return <View key={`empty-d-${colIdx}`} style={{ width: halfCardWidth }} />;
                     }
-                    style={({ pressed }) => ({
-                      width: "48%",
-                      backgroundColor: bg,
-                      borderRadius: 18,
-                      padding: 16,
-                      minHeight: 130,
-                      opacity: pressed ? 0.8 : 1,
-                      borderWidth: 1,
-                      borderColor: `${accent}22`,
-                      shadowColor: accent,
-                      shadowOffset: { width: 0, height: 2 },
-                      shadowOpacity: 0.08,
-                      shadowRadius: 8,
-                      elevation: 2,
-                    })}
-                  >
-                    {deptImg ? (
-                      <Image
-                        source={deptImg}
+                    const bg = DEPT_BG[dept.name] ?? "#f8fafc";
+                    const accent = DEPT_ACCENT[dept.name] ?? "#64748b";
+                    const deptImg = getDepartmentImage(dept.name);
+                    return (
+                      <TouchableOpacity
+                        key={dept.id}
+                        onPress={() =>
+                          router.push(
+                            `/department/${encodeURIComponent(dept.name)}`
+                          )
+                        }
+                        activeOpacity={0.82}
                         style={{
-                          width: 44,
-                          height: 44,
-                          borderRadius: 12,
-                          marginBottom: 8,
-                        }}
-                        resizeMode="cover"
-                      />
-                    ) : null}
-                    <Text
-                      style={{
-                        marginTop: deptImg ? 0 : 4,
-                        fontWeight: "800",
-                        fontSize: 14,
-                        color: "#0f172a",
-                        lineHeight: 18,
-                      }}
-                    >
-                      {dept.name}
-                    </Text>
-                    <View
-                      style={{
-                        marginTop: 6,
-                        flexDirection: "row",
-                        alignItems: "center",
-                        gap: 4,
-                      }}
-                    >
-                      <View
-                        style={{
-                          width: 6,
-                          height: 6,
-                          borderRadius: 3,
-                          backgroundColor: accent,
-                        }}
-                      />
-                      <Text
-                        style={{
-                          fontSize: 12,
-                          color: "#64748b",
-                          fontWeight: "600",
+                          width: halfCardWidth,
+                          minHeight: 132,
+                          justifyContent: "space-between",
+                          backgroundColor: bg,
+                          borderRadius: 18,
+                          padding: 16,
+                          borderWidth: 1,
+                          borderColor: `${accent}26`,
+                          shadowColor: "#000",
+                          shadowOffset: { width: 0, height: 1 },
+                          shadowOpacity: 0.04,
+                          shadowRadius: 4,
+                          elevation: 1,
                         }}
                       >
-                        {dept.doctor_count}{" "}
-                        {dept.doctor_count === 1 ? "doctor" : "doctors"}
-                      </Text>
-                    </View>
-                  </Pressable>
-                );
-              })}
+                        <View>
+                          {deptImg ? (
+                            <Image
+                              source={deptImg}
+                              style={{
+                                width: 44,
+                                height: 44,
+                                borderRadius: 12,
+                                marginBottom: 8,
+                              }}
+                              resizeMode="cover"
+                            />
+                          ) : null}
+                          <Text
+                            style={{
+                              marginTop: deptImg ? 0 : 4,
+                              fontWeight: "800",
+                              fontSize: 14,
+                              color: "#0f172a",
+                              lineHeight: 18,
+                            }}
+                          >
+                            {dept.name}
+                          </Text>
+                        </View>
+                        <Text
+                          style={{
+                            marginTop: 8,
+                            fontSize: 12,
+                            color: "#64748b",
+                            fontWeight: "600",
+                          }}
+                        >
+                          {dept.doctor_count}{" "}
+                          {dept.doctor_count === 1 ? "doctor" : "doctors"}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              ))}
             </View>
           )}
         </View>

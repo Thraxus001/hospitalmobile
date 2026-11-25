@@ -10,41 +10,45 @@ import {
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { api, fmtDate, fmtTime, money } from "../../lib/api";
-import { storage } from "../../lib/storage";
-import type { Appointment, UserPaymentPref } from "../../lib/types";
+import {
+  ALLOWED_BANKS,
+  type CardOrBankType,
+  DEFAULT_INSURERS,
+  detectCardBrand,
+  formatCardNumber,
+  formatExpiry,
+  loadSavedCardPref,
+} from "../../lib/paymentPrefs";
+import type { Appointment, HospitalSettings, UserPaymentPref } from "../../lib/types";
 import { Button, Card, Field } from "../../components/ui";
+import { StyledDropdown } from "../../components/StyledDropdown";
 
 type Method = "mpesa" | "card" | "insurance";
-
-function formatCardNumber(val: string): string {
-  const digits = val.replace(/\D/g, "").slice(0, 16);
-  return digits.replace(/(\d{4})(?=\d)/g, "$1 ").trim();
-}
-
-function formatExpiry(val: string): string {
-  const digits = val.replace(/\D/g, "").slice(0, 4);
-  if (digits.length >= 3) {
-    return `${digits.slice(0, 2)}/${digits.slice(2, 4)}`;
-  }
-  return digits;
-}
 
 export default function Pay() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const [appt, setAppt] = useState<Appointment | null>(null);
+  const [settings, setSettings] = useState<HospitalSettings | null>(null);
   const [method, setMethod] = useState<Method>("mpesa");
 
   // Form states
   const [phone, setPhone] = useState("");
   const [provider, setProvider] = useState("");
   const [member, setMember] = useState("");
+  const [isInsuranceDropdownOpen, setIsInsuranceDropdownOpen] = useState(false);
 
   // Card / Bank states
+  const [cardOrBankType, setCardOrBankType] = useState<CardOrBankType>("card");
   const [cardHolder, setCardHolder] = useState("");
   const [cardNumber, setCardNumber] = useState("");
   const [cardExpiry, setCardExpiry] = useState("");
   const [cardCvv, setCardCvv] = useState("");
+
+  const [bankName, setBankName] = useState("");
+  const [bankAccount, setBankAccount] = useState("");
+  const [bankHolder, setBankHolder] = useState("");
+  const [isBankDropdownOpen, setIsBankDropdownOpen] = useState(false);
 
   const [busy, setBusy] = useState(false);
   const [releasing, setReleasing] = useState(false);
@@ -88,29 +92,47 @@ export default function Pay() {
     return () => clearInterval(timer);
   }, [appt?.hold_expires_at, appt?.status, refresh]);
 
-  // Load user saved payment preferences to prefill
+  // Load user saved payment preferences & accepted insurance list
   useEffect(() => {
     (async () => {
       try {
-        const p = await api<UserPaymentPref>("/patient/preferences");
-        if (
+        const [s, p, savedCard] = await Promise.all([
+          api<HospitalSettings>("/patient/settings").catch(() => null),
+          api<UserPaymentPref>("/patient/preferences"),
+          loadSavedCardPref(),
+        ]);
+        if (s) setSettings(s);
+
+        if (p.preferred_method === "bank") {
+          setMethod("card");
+          setCardOrBankType("bank");
+        } else if (
           p.preferred_method === "mpesa" ||
           p.preferred_method === "card" ||
           p.preferred_method === "insurance"
         ) {
           setMethod(p.preferred_method);
         }
+
         if (p.mpesa_phone) setPhone(p.mpesa_phone);
         if (p.insurance_provider) setProvider(p.insurance_provider);
         if (p.insurance_member_no) setMember(p.insurance_member_no);
 
-        const savedCardStr = await storage.getItem("saved_card_pref");
-        if (savedCardStr) {
-          const parsed = JSON.parse(savedCardStr);
-          if (parsed.cardHolder) setCardHolder(parsed.cardHolder);
-          if (parsed.cardNumber) setCardNumber(parsed.cardNumber);
-          if (parsed.cardExpiry) setCardExpiry(parsed.cardExpiry);
-          if (parsed.cardCvv) setCardCvv(parsed.cardCvv);
+        if (savedCard) {
+          if (savedCard.cardHolder) setCardHolder(savedCard.cardHolder);
+          if (savedCard.cardNumber) setCardNumber(savedCard.cardNumber);
+          if (savedCard.cardExpiry) setCardExpiry(savedCard.cardExpiry);
+          if (savedCard.cardCvv) setCardCvv(savedCard.cardCvv);
+          if (savedCard.bankName) setBankName(savedCard.bankName);
+          if (savedCard.bankAccount) setBankAccount(savedCard.bankAccount);
+          if (savedCard.bankHolder) setBankHolder(savedCard.bankHolder);
+
+          if (
+            savedCard.cardOrBankType === "bank" ||
+            (!savedCard.cardNumber && savedCard.bankAccount)
+          ) {
+            setCardOrBankType("bank");
+          }
         }
       } catch {}
     })();
@@ -141,15 +163,26 @@ export default function Pay() {
         });
         startPolling();
       } else if (method === "card") {
-        await api("/payments/card", {
-          body: {
-            appointment_id: appt.id,
-            card_number: cardNumber,
-            card_holder: cardHolder || "Valued Patient",
-            expiry: cardExpiry,
-            cvv: cardCvv,
-          },
-        });
+        if (cardOrBankType === "bank") {
+          await api("/payments/bank", {
+            body: {
+              appointment_id: appt.id,
+              bank_name: bankName,
+              account_number: bankAccount,
+              account_holder: bankHolder || "Valued Patient",
+            },
+          });
+        } else {
+          await api("/payments/card", {
+            body: {
+              appointment_id: appt.id,
+              card_number: cardNumber,
+              card_holder: cardHolder || "Valued Patient",
+              expiry: cardExpiry,
+              cvv: cardCvv,
+            },
+          });
+        }
         await refresh();
       } else {
         await api("/payments/insurance", {
@@ -210,7 +243,16 @@ export default function Pay() {
     }
   };
 
-  if (!appt) return <ActivityIndicator className="mt-10" color="#059669" />;
+  if (!appt) {
+    return (
+      <View style={{ flex: 1, backgroundColor: "#f8fafc", justifyContent: "center", alignItems: "center" }}>
+        <ActivityIndicator size="large" color="#059669" />
+        <Text style={{ marginTop: 12, color: "#64748b", fontSize: 14, fontWeight: "600" }}>
+          Loading appointment details…
+        </Text>
+      </View>
+    );
+  }
 
   if (appt.status === "confirmed")
     return (
@@ -248,6 +290,15 @@ export default function Pay() {
         </View>
       </View>
     );
+
+  const baseInsurers =
+    settings?.insurance_providers && settings.insurance_providers.length > 0
+      ? settings.insurance_providers
+      : DEFAULT_INSURERS;
+  const allowedInsurers =
+    provider && !baseInsurers.includes(provider)
+      ? [provider, ...baseInsurers]
+      : baseInsurers;
 
   const mins = remainingSecs !== null ? Math.floor(remainingSecs / 60) : 0;
   const secs = remainingSecs !== null ? remainingSecs % 60 : 0;
@@ -381,67 +432,189 @@ export default function Pay() {
         </>
       ) : method === "card" ? (
         <Card className="p-4 mb-3">
-          <Text className="text-sm font-bold text-slate-900 mb-3">
-            Credit / Debit Card
-          </Text>
-
-          <Field
-            label="Cardholder name"
-            placeholder="e.g. Jane Doe"
-            value={cardHolder}
-            onChangeText={setCardHolder}
-          />
-
-          <Field
-            label="Card number"
-            keyboardType="number-pad"
-            placeholder="4000 1234 5678 9010"
-            value={cardNumber}
-            onChangeText={(v) => setCardNumber(formatCardNumber(v))}
-            maxLength={19}
-          />
-
-          <View className="flex-row gap-3">
-            <View className="flex-1">
-              <Field
-                label="Expiry date"
-                keyboardType="number-pad"
-                placeholder="MM/YY"
-                value={cardExpiry}
-                onChangeText={(v) => setCardExpiry(formatExpiry(v))}
-                maxLength={5}
-              />
-            </View>
-            <View className="flex-1">
-              <Field
-                label="CVV"
-                keyboardType="number-pad"
-                placeholder="123"
-                value={cardCvv}
-                onChangeText={(v) => setCardCvv(v.replace(/\D/g, "").slice(0, 4))}
-                maxLength={4}
-                secureTextEntry
-              />
+          <View className="flex-row items-center justify-between mb-3">
+            <Text className="text-sm font-bold text-slate-900">
+              Card & Bank Payment
+            </Text>
+            <View className="rounded-lg bg-sky-100 px-2 py-0.5">
+              <Text className="text-[11px] font-bold text-sky-700">
+                {cardOrBankType === "bank" ? "BANK" : detectCardBrand(cardNumber)}
+              </Text>
             </View>
           </View>
 
-          <View className="mt-2">
-            <Button
-              title={`Pay ${money(appt.amount_due)} with Card`}
-              onPress={submit}
-              loading={busy}
-              disabled={cardNumber.replace(/\s/g, "").length < 12}
-            />
+          {/* Sub-selector: Debit / Credit Card vs Bank Account */}
+          <View className="mb-4 flex-row rounded-xl bg-slate-200 p-1">
+            {(
+              [
+                { key: "card", label: "Debit / Credit Card" },
+                { key: "bank", label: "Bank Account" },
+              ] as const
+            ).map((opt) => {
+              const active = cardOrBankType === opt.key;
+              return (
+                <Pressable
+                  key={opt.key}
+                  onPress={() => setCardOrBankType(opt.key)}
+                  className={`flex-1 items-center rounded-lg py-2 ${
+                    active ? "bg-white shadow-sm" : ""
+                  }`}
+                >
+                  <Text
+                    className={`text-xs font-bold ${
+                      active ? "text-slate-900" : "text-slate-600"
+                    }`}
+                  >
+                    {opt.label}
+                  </Text>
+                </Pressable>
+              );
+            })}
           </View>
+
+          {cardOrBankType === "card" ? (
+            <>
+              <Field
+                label="Cardholder name"
+                placeholder="e.g. Jane Doe"
+                value={cardHolder}
+                onChangeText={setCardHolder}
+              />
+
+              <Field
+                label="Card number"
+                keyboardType="number-pad"
+                placeholder="4000 1234 5678 9010"
+                value={cardNumber}
+                onChangeText={(v) => setCardNumber(formatCardNumber(v))}
+                maxLength={19}
+              />
+
+              <View className="flex-row gap-3">
+                <View className="flex-1">
+                  <Field
+                    label="Expiry date"
+                    keyboardType="number-pad"
+                    placeholder="MM/YY"
+                    value={cardExpiry}
+                    onChangeText={(v) => setCardExpiry(formatExpiry(v))}
+                    maxLength={5}
+                  />
+                </View>
+                <View className="flex-1">
+                  <Field
+                    label="CVV"
+                    keyboardType="number-pad"
+                    placeholder="123"
+                    value={cardCvv}
+                    onChangeText={(v) => setCardCvv(v.replace(/\D/g, "").slice(0, 4))}
+                    maxLength={4}
+                    secureTextEntry
+                  />
+                </View>
+              </View>
+
+              <View className="mt-2">
+                <Button
+                  title={`Pay ${money(appt.amount_due)} with Card`}
+                  onPress={submit}
+                  loading={busy}
+                  disabled={cardNumber.replace(/\s/g, "").length < 12}
+                />
+              </View>
+            </>
+          ) : (
+            <>
+              <StyledDropdown
+                label="Select bank"
+                placeholder="Select your bank..."
+                value={bankName}
+                options={ALLOWED_BANKS}
+                isOpen={isBankDropdownOpen}
+                onToggle={() => setIsBankDropdownOpen((p) => !p)}
+                onSelect={(b) => {
+                  setBankName(b);
+                  setIsBankDropdownOpen(false);
+                }}
+                headerTitle={`Supported Banks (${ALLOWED_BANKS.length})`}
+                clearLabel="Clear Bank"
+                onClear={() => {
+                  setBankName("");
+                  setIsBankDropdownOpen(false);
+                }}
+              />
+
+              <Field
+                label="Account holder name"
+                placeholder="e.g. Jane Doe"
+                value={bankHolder}
+                onChangeText={setBankHolder}
+              />
+
+              <Field
+                label="Bank account number"
+                keyboardType="number-pad"
+                placeholder="e.g. 0123456789"
+                value={bankAccount}
+                onChangeText={(v) => setBankAccount(v.replace(/\D/g, ""))}
+              />
+
+              <View className="mt-2">
+                <Button
+                  title={`Pay ${money(appt.amount_due)} with Bank Account`}
+                  onPress={submit}
+                  loading={busy}
+                  disabled={!bankName || bankAccount.replace(/\D/g, "").length < 4}
+                />
+              </View>
+            </>
+          )}
         </Card>
       ) : (
-        <>
-          <Field
+        <Card className="p-4 mb-3">
+          <View className="flex-row items-center justify-between mb-3">
+            <Text className="text-sm font-bold text-slate-900">
+              Insurance Cover
+            </Text>
+            <View
+              style={{
+                backgroundColor: "#dcfce7",
+                paddingHorizontal: 8,
+                paddingVertical: 2,
+                borderRadius: 8,
+              }}
+            >
+              <Text
+                style={{
+                  fontSize: 11,
+                  color: "#15803d",
+                  fontWeight: "700",
+                }}
+              >
+                INSURANCE
+              </Text>
+            </View>
+          </View>
+
+          <StyledDropdown
             label="Insurance provider"
-            placeholder="e.g. AAR Insurance"
+            placeholder="Select your insurance provider..."
             value={provider}
-            onChangeText={setProvider}
+            options={allowedInsurers}
+            isOpen={isInsuranceDropdownOpen}
+            onToggle={() => setIsInsuranceDropdownOpen((p) => !p)}
+            onSelect={(item) => {
+              setProvider(item);
+              setIsInsuranceDropdownOpen(false);
+            }}
+            headerTitle={`Accepted Insurance Partners (${allowedInsurers.length})`}
+            clearLabel="Clear Provider"
+            onClear={() => {
+              setProvider("");
+              setIsInsuranceDropdownOpen(false);
+            }}
           />
+
           <Field
             label="Member number"
             autoCapitalize="characters"
@@ -455,7 +628,7 @@ export default function Pay() {
             loading={busy}
             disabled={!provider || !member}
           />
-        </>
+        </Card>
       )}
 
       {/* Release Slot Button */}

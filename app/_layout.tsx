@@ -1,8 +1,19 @@
 import "../global.css";
 import { useEffect } from "react";
+import { View } from "react-native";
 import { Stack, useRouter, useSegments } from "expo-router";
 import { StatusBar } from "expo-status-bar";
+import { ThemeProvider, DefaultTheme } from "@react-navigation/native";
 import { AuthProvider, useAuth } from "../lib/auth";
+
+const appTheme = {
+  ...DefaultTheme,
+  colors: {
+    ...DefaultTheme.colors,
+    background: "#f1f5f9",
+    card: "#ffffff",
+  },
+};
 
 function Guard() {
   const { user, loading } = useAuth();
@@ -30,8 +41,17 @@ function Guard() {
     }
   }, [user, loading, segments]);
 
+  if (loading) {
+    return <View style={{ flex: 1, backgroundColor: "#f1f5f9" }} />;
+  }
+
   return (
-    <Stack>
+    <Stack
+      screenOptions={{
+        contentStyle: { backgroundColor: "#f1f5f9" },
+        animation: "slide_from_right",
+      }}
+    >
       <Stack.Screen name="(auth)" options={{ headerShown: false }} />
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
       <Stack.Screen
@@ -64,9 +84,11 @@ function Guard() {
 
 export default function Root() {
   return (
-    <AuthProvider>
-      <StatusBar style="auto" />
-      <Guard />
-    </AuthProvider>
+    <ThemeProvider value={appTheme}>
+      <AuthProvider>
+        <StatusBar style="auto" />
+        <Guard />
+      </AuthProvider>
+    </ThemeProvider>
   );
 }

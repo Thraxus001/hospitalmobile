@@ -18,6 +18,7 @@ export type Doctor = {
   consultation_fee: number;
   working_days: number[]; // 0 = Monday
   has_slots_today: boolean;
+  max_daily_appointments?: number;
 };
 
 export type Slot = { start_at: string; end_at: string };
@@ -29,6 +30,7 @@ export type Appointment = {
   id: number;
   doctor_id: number;
   doctor: Doctor;
+  patient?: User | null;
   start_at: string;
   end_at: string;
   status: AppointmentStatus;
@@ -37,6 +39,18 @@ export type Appointment = {
   amount_due: number;
   hold_expires_at: string | null;
   rescheduled_from_id: number | null;
+};
+
+export type Notif = {
+  id: number;
+  kind: string;
+  channel: string;
+  subject: string;
+  body: string;
+  status: string;
+  appointment_id: number | null;
+  created_at: string;
+  read_at: string | null;
 };
 
 export type HospitalSettings = {

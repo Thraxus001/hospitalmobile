@@ -9,13 +9,16 @@ import {
   StatusBar,
   Text,
   TextInput,
+  TouchableOpacity,
   View,
 } from "react-native";
 import { Link } from "expo-router";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAuth } from "../../lib/auth";
 
 export default function Login() {
   const { login } = useAuth();
+  const insets = useSafeAreaInsets();
   const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
   const [showPw, setShowPw] = useState(false);
@@ -36,17 +39,18 @@ export default function Login() {
 
   return (
     <KeyboardAvoidingView
-      style={{ flex: 1, backgroundColor: "#f8fafc" }}
-      behavior={Platform.OS === "ios" ? "padding" : "height"}
+      style={{ flex: 1, backgroundColor: "#ffffff" }}
+      behavior={Platform.OS === "ios" ? "padding" : undefined}
     >
       <StatusBar barStyle="light-content" />
       <ScrollView
-        contentContainerStyle={{ flexGrow: 1 }}
+        style={{ flex: 1, backgroundColor: "#ffffff" }}
+        contentContainerStyle={{ flexGrow: 1, paddingBottom: 16 }}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
         {/* Top banner with hero image */}
-        <View style={{ height: 260, backgroundColor: "#0f4c81", overflow: "hidden" }}>
+        <View style={{ height: 220, backgroundColor: "#0f4c81", overflow: "hidden" }}>
           <Image
             source={require("../../assets/hero-banner.png")}
             style={{ position: "absolute", width: "100%", height: "100%", opacity: 0.35 }}
@@ -57,16 +61,16 @@ export default function Login() {
               flex: 1,
               alignItems: "center",
               justifyContent: "flex-end",
-              paddingBottom: 32,
+              paddingBottom: 28,
             }}
           >
             <Image
               source={require("../../assets/icons/logo.png")}
-              style={{ width: 68, height: 68, borderRadius: 18, marginBottom: 12 }}
+              style={{ width: 64, height: 64, borderRadius: 18, marginBottom: 10 }}
               resizeMode="contain"
             />
             <Text
-              style={{ color: "#fff", fontSize: 26, fontWeight: "800", letterSpacing: -0.5 }}
+              style={{ color: "#fff", fontSize: 25, fontWeight: "800", letterSpacing: -0.5 }}
             >
               Clinic Booking
             </Text>
@@ -85,19 +89,14 @@ export default function Login() {
             borderTopRightRadius: 28,
             marginTop: -20,
             paddingHorizontal: 24,
-            paddingTop: 32,
-            paddingBottom: 40,
-            shadowColor: "#000",
-            shadowOffset: { width: 0, height: -4 },
-            shadowOpacity: 0.06,
-            shadowRadius: 16,
-            elevation: 10,
+            paddingTop: 28,
+            paddingBottom: 12,
           }}
         >
           <Text style={{ fontSize: 24, fontWeight: "800", color: "#0f172a", marginBottom: 4 }}>
             Welcome back
           </Text>
-          <Text style={{ color: "#64748b", fontSize: 15, marginBottom: 28 }}>
+          <Text style={{ color: "#64748b", fontSize: 15, marginBottom: 24 }}>
             Sign in to manage your appointments
           </Text>
 
@@ -128,13 +127,17 @@ export default function Login() {
           <Text style={{ fontSize: 13, fontWeight: "600", color: "#374151", marginBottom: 6 }}>
             Password
           </Text>
-          <View style={{ position: "relative", marginBottom: 24 }}>
+          <View style={{ position: "relative", marginBottom: 8 }}>
             <TextInput
               value={password}
               onChangeText={setPassword}
               placeholder="Enter your password"
               placeholderTextColor="#9ca3af"
               secureTextEntry={!showPw}
+              returnKeyType="done"
+              onSubmitEditing={() => {
+                if (canSubmit) submit();
+              }}
               style={{
                 height: 52,
                 borderRadius: 14,
@@ -162,40 +165,51 @@ export default function Login() {
               </Text>
             </Pressable>
           </View>
-
-          {/* Sign in button */}
-          <Pressable
-            onPress={submit}
-            disabled={!canSubmit}
-            style={({ pressed }) => ({
-              height: 54,
-              borderRadius: 16,
-              backgroundColor: canSubmit ? "#059669" : "#d1fae5",
-              alignItems: "center",
-              justifyContent: "center",
-              opacity: pressed ? 0.88 : 1,
-              shadowColor: "#059669",
-              shadowOffset: { width: 0, height: 6 },
-              shadowOpacity: canSubmit ? 0.35 : 0,
-              shadowRadius: 12,
-              elevation: canSubmit ? 6 : 0,
-            })}
-          >
-            <Text style={{ color: canSubmit ? "#fff" : "#6ee7b7", fontWeight: "800", fontSize: 16 }}>
-              {busy ? "Signing in…" : "Sign in"}
-            </Text>
-          </Pressable>
-
-          <View style={{ marginTop: 24, flexDirection: "row", justifyContent: "center" }}>
-            <Text style={{ color: "#64748b", fontSize: 15 }}>New here? </Text>
-            <Link href="/(auth)/register">
-              <Text style={{ color: "#059669", fontWeight: "700", fontSize: 15 }}>
-                Create account
-              </Text>
-            </Link>
-          </View>
         </View>
       </ScrollView>
+
+      {/* Pinned bottom action bar — always visible even with keyboard open */}
+      <View
+        style={{
+          backgroundColor: "#ffffff",
+          borderTopWidth: 1,
+          borderTopColor: "#f1f5f9",
+          paddingHorizontal: 24,
+          paddingTop: 12,
+          paddingBottom: Math.max(insets.bottom, 16),
+        }}
+      >
+        <TouchableOpacity
+          onPress={submit}
+          disabled={!canSubmit}
+          activeOpacity={0.85}
+          style={{
+            height: 54,
+            borderRadius: 16,
+            backgroundColor: canSubmit ? "#059669" : "#94a3b8",
+            alignItems: "center",
+            justifyContent: "center",
+            shadowColor: "#059669",
+            shadowOffset: { width: 0, height: 6 },
+            shadowOpacity: canSubmit ? 0.3 : 0,
+            shadowRadius: 12,
+            elevation: canSubmit ? 6 : 0,
+          }}
+        >
+          <Text style={{ color: "#ffffff", fontWeight: "800", fontSize: 16 }}>
+            {busy ? "Signing in…" : "Sign in"}
+          </Text>
+        </TouchableOpacity>
+
+        <View style={{ marginTop: 14, flexDirection: "row", justifyContent: "center" }}>
+          <Text style={{ color: "#64748b", fontSize: 14 }}>New here? </Text>
+          <Link href="/(auth)/register">
+            <Text style={{ color: "#059669", fontWeight: "700", fontSize: 14 }}>
+              Create account
+            </Text>
+          </Link>
+        </View>
+      </View>
     </KeyboardAvoidingView>
   );
 }

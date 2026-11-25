@@ -8,6 +8,7 @@ import {
   StatusBar,
   Text,
   TextInput,
+  TouchableOpacity,
   View,
 } from "react-native";
 import { useRouter } from "expo-router";
@@ -89,10 +90,11 @@ export default function FindDoctor() {
           paddingHorizontal: 20,
         }}
       >
-        <Pressable
+        <TouchableOpacity
           onPress={handleReturn}
           accessibilityRole="button"
-          style={({ pressed }) => ({
+          activeOpacity={0.75}
+          style={{
             flexDirection: "row",
             alignItems: "center",
             marginBottom: 12,
@@ -102,9 +104,7 @@ export default function FindDoctor() {
             paddingHorizontal: 8,
             marginLeft: -8,
             borderRadius: 8,
-            backgroundColor: pressed ? "rgba(255,255,255,0.12)" : "transparent",
-            cursor: "pointer" as any,
-          })}
+          }}
         >
           <Text style={{ color: "#a7f3d0", fontSize: 26, fontWeight: "400", lineHeight: 26 }}>
             ‹
@@ -112,7 +112,7 @@ export default function FindDoctor() {
           <Text style={{ color: "#a7f3d0", fontSize: 15, fontWeight: "700" }}>
             Back to Home
           </Text>
-        </Pressable>
+        </TouchableOpacity>
 
         <Text
           style={{
@@ -169,9 +169,10 @@ export default function FindDoctor() {
             const isSelected = selectedDept === item.name;
             const deptImg = getDepartmentImage(item.name);
             return (
-              <Pressable
+              <TouchableOpacity
                 onPress={() => setSelectedDept(item.name)}
-                style={({ pressed }) => ({
+                activeOpacity={0.8}
+                style={{
                   flexDirection: "row",
                   alignItems: "center",
                   paddingHorizontal: 14,
@@ -180,9 +181,8 @@ export default function FindDoctor() {
                   borderWidth: 1.5,
                   borderColor: isSelected ? "#059669" : "#e2e8f0",
                   backgroundColor: isSelected ? "#ecfdf5" : "#f8fafc",
-                  opacity: pressed ? 0.8 : 1,
                   gap: 6,
-                })}
+                }}
               >
                 {deptImg ? (
                   <Image
@@ -200,7 +200,7 @@ export default function FindDoctor() {
                 >
                   {item.name}
                 </Text>
-              </Pressable>
+              </TouchableOpacity>
             );
           }}
         />
@@ -366,9 +366,10 @@ export default function FindDoctor() {
               </View>
 
               {/* Book session button */}
-              <Pressable
+              <TouchableOpacity
                 onPress={() => router.push(`/doctor/${d.id}`)}
-                style={({ pressed }) => ({
+                activeOpacity={0.85}
+                style={{
                   marginTop: 14,
                   height: 44,
                   borderRadius: 12,
@@ -377,14 +378,13 @@ export default function FindDoctor() {
                   justifyContent: "center",
                   flexDirection: "row",
                   gap: 6,
-                  opacity: pressed ? 0.85 : 1,
-                })}
+                }}
               >
                 <Text style={{ color: "#fff", fontWeight: "700", fontSize: 14 }}>
                   Book Session
                 </Text>
                 <Text style={{ color: "#fff", fontSize: 14 }}>→</Text>
-              </Pressable>
+              </TouchableOpacity>
             </Card>
           )}
         />

@@ -11,6 +11,8 @@ import { useFocusEffect, useRouter } from "expo-router";
 import { api, fmtDate, fmtTime, money } from "../../lib/api";
 import type { Appointment } from "../../lib/types";
 import { Button, Card, StatusBadge } from "../../components/ui";
+import { useAuth } from "../../lib/auth";
+import DoctorSchedule from "../../components/DoctorSchedule";
 
 function HoldTimer({
   expiresAt,
@@ -106,6 +108,12 @@ function HoldTimer({
 
 export default function Appointments() {
   const router = useRouter();
+  const { user } = useAuth();
+
+  if (user?.role === "doctor") {
+    return <DoctorSchedule />;
+  }
+
   const [items, setItems] = useState<Appointment[]>([]);
   const [refreshing, setRefreshing] = useState(false);
   const [cancellingId, setCancellingId] = useState<number | null>(null);

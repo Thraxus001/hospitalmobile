@@ -6,6 +6,7 @@ import {
   Pressable,
   StatusBar,
   Text,
+  TouchableOpacity,
   View,
 } from "react-native";
 import { useRouter } from "expo-router";
@@ -76,20 +77,20 @@ export default function Welcome() {
           zIndex: 30,
         }}
       >
-        <Pressable
+        <TouchableOpacity
           onPress={() => router.replace("/(auth)/login")}
-          style={({ pressed }) => ({
+          activeOpacity={0.75}
+          style={{
             paddingHorizontal: 16,
             paddingVertical: 8,
             backgroundColor: "rgba(255, 255, 255, 0.2)",
             borderRadius: 20,
-            opacity: pressed ? 0.7 : 1,
-          })}
+          }}
         >
           <Text style={{ color: "#fff", fontWeight: "700", fontSize: 13 }}>
             Skip
           </Text>
-        </Pressable>
+        </TouchableOpacity>
       </View>
 
       {/* Full-screen carousel */}
@@ -197,26 +198,26 @@ export default function Welcome() {
         </Text>
 
         {/* CTA Next / Get started button */}
-        <Pressable
+        <TouchableOpacity
           onPress={next}
-          style={({ pressed }) => ({
+          activeOpacity={0.85}
+          style={{
             height: 56,
             borderRadius: 16,
             backgroundColor: slide.accent,
             alignItems: "center",
             justifyContent: "center",
-            opacity: pressed ? 0.85 : 1,
             shadowColor: slide.accent,
             shadowOffset: { width: 0, height: 8 },
             shadowOpacity: 0.5,
             shadowRadius: 16,
             elevation: 10,
-          })}
+          }}
         >
           <Text style={{ color: "#000", fontWeight: "800", fontSize: 17 }}>
             {current === SLIDES.length - 1 ? "Get started →" : "Next →"}
           </Text>
-        </Pressable>
+        </TouchableOpacity>
 
         {/* Sign in link */}
         <Pressable

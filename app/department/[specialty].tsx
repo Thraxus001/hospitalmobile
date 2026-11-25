@@ -8,6 +8,7 @@ import {
   ScrollView,
   StatusBar,
   Text,
+  TouchableOpacity,
   View,
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
@@ -330,10 +331,11 @@ export default function DepartmentScreen() {
           paddingHorizontal: 20,
         }}
       >
-        <Pressable
+        <TouchableOpacity
           onPress={handleReturn}
           accessibilityRole="button"
-          style={({ pressed }) => ({
+          activeOpacity={0.75}
+          style={{
             flexDirection: "row",
             alignItems: "center",
             marginBottom: 12,
@@ -343,9 +345,7 @@ export default function DepartmentScreen() {
             paddingHorizontal: 8,
             marginLeft: -8,
             borderRadius: 8,
-            backgroundColor: pressed ? "rgba(255,255,255,0.12)" : "transparent",
-            cursor: "pointer" as any,
-          })}
+          }}
         >
           <Text style={{ color: "#93c5fd", fontSize: 26, fontWeight: "400", lineHeight: 26 }}>
             ‹
@@ -353,7 +353,7 @@ export default function DepartmentScreen() {
           <Text style={{ color: "#93c5fd", fontSize: 15, fontWeight: "700" }}>
             Back to Departments
           </Text>
-        </Pressable>
+        </TouchableOpacity>
 
         <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
           {deptImg ? (
@@ -392,7 +392,6 @@ export default function DepartmentScreen() {
         {/* ── 1. Department Overview Card ── */}
         <Card className="mb-4 p-4 border border-slate-200">
           <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 8 }}>
-            <Text style={{ fontSize: 16 }}>ℹ️</Text>
             <Text style={{ fontSize: 16, fontWeight: "800", color: "#0f172a" }}>
               About This Department
             </Text>
@@ -527,32 +526,32 @@ export default function DepartmentScreen() {
               There are currently no active doctors scheduled in {specialty}. You can consult a General Practitioner or check all doctors.
             </Text>
             <View style={{ flexDirection: "row", gap: 10, flexWrap: "wrap", justifyContent: "center" }}>
-              <Pressable
+              <TouchableOpacity
                 onPress={handleReturn}
-                style={({ pressed }) => ({
-                  backgroundColor: pressed ? "#e2e8f0" : "#f1f5f9",
+                activeOpacity={0.8}
+                style={{
+                  backgroundColor: "#f1f5f9",
                   paddingHorizontal: 16,
                   paddingVertical: 10,
                   borderRadius: 10,
                   borderWidth: 1,
                   borderColor: "#cbd5e1",
-                  cursor: "pointer" as any,
-                })}
+                }}
               >
                 <Text style={{ color: "#334155", fontWeight: "700" }}>‹ All Departments</Text>
-              </Pressable>
-              <Pressable
+              </TouchableOpacity>
+              <TouchableOpacity
                 onPress={() => router.push("/find-doctor")}
-                style={({ pressed }) => ({
-                  backgroundColor: pressed ? "#047857" : "#059669",
+                activeOpacity={0.85}
+                style={{
+                  backgroundColor: "#059669",
                   paddingHorizontal: 16,
                   paddingVertical: 10,
                   borderRadius: 10,
-                  cursor: "pointer" as any,
-                })}
+                }}
               >
                 <Text style={{ color: "#fff", fontWeight: "700" }}>Browse All Doctors</Text>
-              </Pressable>
+              </TouchableOpacity>
             </View>
           </Card>
         ) : (
@@ -652,9 +651,10 @@ export default function DepartmentScreen() {
                 </View>
 
                 {/* Explicit Book Session CTA Button */}
-                <Pressable
+                <TouchableOpacity
                   onPress={() => router.push(`/doctor/${d.id}`)}
-                  style={({ pressed }) => ({
+                  activeOpacity={0.85}
+                  style={{
                     marginTop: 14,
                     height: 46,
                     borderRadius: 12,
@@ -663,19 +663,18 @@ export default function DepartmentScreen() {
                     justifyContent: "center",
                     flexDirection: "row",
                     gap: 8,
-                    opacity: pressed ? 0.85 : 1,
                     shadowColor: "#059669",
                     shadowOffset: { width: 0, height: 3 },
                     shadowOpacity: 0.25,
                     shadowRadius: 6,
                     elevation: 3,
-                  })}
+                  }}
                 >
                   <Text style={{ color: "#fff", fontWeight: "800", fontSize: 15 }}>
                     Book Session with {d.full_name.split(" ")[1] ?? "Doctor"}
                   </Text>
                   <Text style={{ color: "#fff", fontSize: 16 }}>→</Text>
-                </Pressable>
+                </TouchableOpacity>
               </Card>
             ))}
           </View>
@@ -683,16 +682,17 @@ export default function DepartmentScreen() {
 
         {/* Bottom Return to Departments CTA */}
         <View style={{ marginTop: 28, alignItems: "center" }}>
-          <Pressable
+          <TouchableOpacity
             onPress={handleReturn}
-            style={({ pressed }) => ({
+            activeOpacity={0.8}
+            style={{
               flexDirection: "row",
               alignItems: "center",
               gap: 8,
               paddingVertical: 12,
               paddingHorizontal: 22,
               borderRadius: 14,
-              backgroundColor: pressed ? "#e2e8f0" : "#ffffff",
+              backgroundColor: "#ffffff",
               borderWidth: 1.5,
               borderColor: "#cbd5e1",
               shadowColor: "#000",
@@ -700,14 +700,13 @@ export default function DepartmentScreen() {
               shadowOpacity: 0.05,
               shadowRadius: 4,
               elevation: 2,
-              cursor: "pointer" as any,
-            })}
+            }}
           >
             <Text style={{ color: "#0f4c81", fontSize: 18, fontWeight: "800" }}>‹</Text>
             <Text style={{ color: "#0f4c81", fontSize: 14, fontWeight: "700" }}>
               Back to All Departments
             </Text>
-          </Pressable>
+          </TouchableOpacity>
         </View>
       </ScrollView>
     </View>

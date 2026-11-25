@@ -12,60 +12,24 @@ import {
 } from "react-native";
 import { useAuth } from "../../lib/auth";
 import { api } from "../../lib/api";
-import { storage } from "../../lib/storage";
+import {
+  ALLOWED_BANKS,
+  buildSavedPrefItems,
+  type CardOrBankType,
+  DEFAULT_INSURERS,
+  detectCardBrand,
+  formatCardNumber,
+  formatExpiry,
+  loadSavedCardPref,
+  METHOD_LABELS,
+  saveCardPref,
+  type SavedCardPref,
+  type SavedPrefItem,
+} from "../../lib/paymentPrefs";
 import type { HospitalSettings, UserPaymentPref } from "../../lib/types";
 import { Button, Card, Field } from "../../components/ui";
-
-const METHOD_LABELS: Record<string, string> = {
-  mpesa: "M-Pesa",
-  card: "Card / Bank",
-  insurance: "Insurance",
-};
-
-const DEFAULT_INSURERS = [
-  "AAR Insurance",
-  "Jubilee Health",
-  "CIC Insurance",
-  "Madison Health",
-  "APA Insurance",
-  "Britam Health",
-  "Sanlam Health",
-  "Liberty Health",
-];
-
-const ALLOWED_BANKS = [
-  "Equity Bank",
-  "KCB Bank (Kenya Commercial Bank)",
-  "Co-operative Bank of Kenya",
-  "NCBA Bank",
-  "Standard Chartered Bank",
-  "Absa Bank Kenya",
-  "Stanbic Bank Kenya",
-  "Diamond Trust Bank (DTB)",
-  "I&M Bank",
-  "Family Bank",
-];
-
-function detectCardBrand(num: string): string {
-  const clean = num.replace(/\D/g, "");
-  if (clean.startsWith("4")) return "VISA";
-  if (/^5[1-5]/.test(clean)) return "MASTERCARD";
-  if (/^3[47]/.test(clean)) return "AMEX";
-  return "CARD";
-}
-
-function formatCardNumber(val: string): string {
-  const digits = val.replace(/\D/g, "").slice(0, 16);
-  return digits.replace(/(\d{4})(?=\d)/g, "$1 ").trim();
-}
-
-function formatExpiry(val: string): string {
-  const digits = val.replace(/\D/g, "").slice(0, 4);
-  if (digits.length >= 3) {
-    return `${digits.slice(0, 2)}/${digits.slice(2, 4)}`;
-  }
-  return digits;
-}
+import { StyledDropdown } from "../../components/StyledDropdown";
+import DoctorProfile from "../../components/DoctorProfile";
 
 function Avatar({ name }: { name: string }) {
   const initials = name
@@ -101,6 +65,11 @@ function Avatar({ name }: { name: string }) {
 
 export default function Profile() {
   const { user, logout } = useAuth();
+
+  if (user?.role === "doctor") {
+    return <DoctorProfile />;
+  }
+
   const [settings, setSettings] = useState<HospitalSettings | null>(null);
   const [saving, setSaving] = useState(false);
   const [method, setMethod] = useState<string | null>(null);
@@ -113,7 +82,7 @@ export default function Profile() {
   const [isInsuranceDropdownOpen, setIsInsuranceDropdownOpen] = useState(false);
 
   // Card / Bank state
-  const [cardOrBankType, setCardOrBankType] = useState<"card" | "bank">("card");
+  const [cardOrBankType, setCardOrBankType] = useState<CardOrBankType>("card");
   const [cardHolder, setCardHolder] = useState("");
   const [cardNumber, setCardNumber] = useState("");
   const [cardExpiry, setCardExpiry] = useState("");
@@ -124,6 +93,7 @@ export default function Profile() {
   const [bankHolder, setBankHolder] = useState("");
   const [isBankDropdownOpen, setIsBankDropdownOpen] = useState(false);
   const [feedback, setFeedback] = useState<{ type: "success" | "error"; msg: string } | null>(null);
+  const [savedItems, setSavedItems] = useState<SavedPrefItem[]>([]);
 
   const notifyUser = (title: string, message: string) => {
     if (Platform.OS === "web") {
@@ -139,9 +109,10 @@ export default function Profile() {
 
   const load = useCallback(async () => {
     try {
-      const [s, p] = await Promise.all([
+      const [s, p, savedCard] = await Promise.all([
         api<HospitalSettings>("/patient/settings"),
         api<UserPaymentPref>("/patient/preferences"),
+        loadSavedCardPref(),
       ]);
       setSettings(s);
       setMethod(p.preferred_method);
@@ -149,25 +120,21 @@ export default function Profile() {
       setMemberNo(p.insurance_member_no ?? "");
       setMpesaPhone(p.mpesa_phone ?? "");
 
-      // Load saved card / bank from local secure storage
-      const savedCardStr = await storage.getItem("saved_card_pref");
-      if (savedCardStr) {
-        try {
-          const parsed = JSON.parse(savedCardStr);
-          if (parsed.cardOrBankType) setCardOrBankType(parsed.cardOrBankType);
-          if (parsed.cardHolder) setCardHolder(parsed.cardHolder);
-          if (parsed.cardNumber) setCardNumber(parsed.cardNumber);
-          if (parsed.cardExpiry) setCardExpiry(parsed.cardExpiry);
-          if (parsed.cardCvv) setCardCvv(parsed.cardCvv);
-          if (parsed.bankName) setBankName(parsed.bankName);
-          if (parsed.bankAccount) setBankAccount(parsed.bankAccount);
-          if (parsed.bankHolder) setBankHolder(parsed.bankHolder);
-        } catch {}
+      if (savedCard) {
+        setCardOrBankType(savedCard.cardOrBankType);
+        if (savedCard.cardHolder) setCardHolder(savedCard.cardHolder);
+        if (savedCard.cardNumber) setCardNumber(savedCard.cardNumber);
+        if (savedCard.cardExpiry) setCardExpiry(savedCard.cardExpiry);
+        if (savedCard.cardCvv) setCardCvv(savedCard.cardCvv);
+        if (savedCard.bankName) setBankName(savedCard.bankName);
+        if (savedCard.bankAccount) setBankAccount(savedCard.bankAccount);
+        if (savedCard.bankHolder) setBankHolder(savedCard.bankHolder);
       } else if (user?.full_name) {
         setCardHolder(user.full_name);
         setBankHolder(user.full_name);
       }
 
+      setSavedItems(buildSavedPrefItems(p, savedCard));
       setLoaded(true);
     } catch (e: any) {
       Alert.alert("Error", e.message);
@@ -184,7 +151,7 @@ export default function Profile() {
     setFeedback(null);
     try {
       // 1. Save general payment preferences to backend
-      await api<UserPaymentPref>("/patient/preferences", {
+      const updatedPref = await api<UserPaymentPref>("/patient/preferences", {
         method: "PUT",
         body: {
           preferred_method: method,
@@ -195,23 +162,26 @@ export default function Profile() {
       });
 
       // 2. Save Card & Bank preferences securely
-      await storage.setItem(
-        "saved_card_pref",
-        JSON.stringify({
-          cardOrBankType,
-          cardHolder,
-          cardNumber,
-          cardExpiry,
-          cardCvv,
-          bankName,
-          bankAccount,
-          bankHolder,
-        })
-      );
+      const cardPayload: SavedCardPref = {
+        cardOrBankType,
+        cardHolder,
+        cardNumber,
+        cardExpiry,
+        cardCvv,
+        bankName,
+        bankAccount,
+        bankHolder,
+      };
+      await saveCardPref(cardPayload);
 
+      const items = buildSavedPrefItems(updatedPref, cardPayload);
+      setSavedItems(items);
       setFeedback({ type: "success", msg: "Payment preferences saved successfully!" });
-      notifyUser("Saved", "Your payment preferences have been updated.");
-      setTimeout(() => setFeedback(null), 5000);
+
+      const summary = items.length
+        ? items.map((i) => `• ${i.label}: ${i.value}${i.isDefault ? " (Default)" : ""}`).join("\n")
+        : "Your payment preferences have been updated.";
+      notifyUser("Preferences Saved", summary);
     } catch (e: any) {
       setFeedback({ type: "error", msg: e.message || "Failed to save payment preferences." });
       notifyUser("Error", e.message);
@@ -431,7 +401,7 @@ export default function Profile() {
                             fontWeight: "700",
                           }}
                         >
-                          {cardBrand}
+                          {cardOrBankType === "bank" ? "BANK" : cardBrand}
                         </Text>
                       </View>
                     </View>
@@ -676,132 +646,24 @@ export default function Profile() {
                     ) : (
                       /* 2. BANK ACCOUNT FORM */
                       <View>
-                        <Text
-                          style={{
-                            fontSize: 13,
-                            fontWeight: "700",
-                            color: "#374151",
-                            marginBottom: 6,
+                        <StyledDropdown
+                          label="Select bank"
+                          placeholder="Select your bank..."
+                          value={bankName}
+                          options={ALLOWED_BANKS}
+                          isOpen={isBankDropdownOpen}
+                          onToggle={() => setIsBankDropdownOpen((p) => !p)}
+                          onSelect={(b) => {
+                            setBankName(b);
+                            setIsBankDropdownOpen(false);
                           }}
-                        >
-                          Select bank
-                        </Text>
-
-                        {/* Bank Dropdown Button */}
-                        <Pressable
-                          onPress={() => setIsBankDropdownOpen((p) => !p)}
-                          style={{
-                            height: 52,
-                            borderRadius: 14,
-                            borderWidth: 1.5,
-                            borderColor: isBankDropdownOpen
-                              ? "#059669"
-                              : "#cbd5e1",
-                            backgroundColor: "#fff",
-                            paddingHorizontal: 16,
-                            flexDirection: "row",
-                            alignItems: "center",
-                            justifyContent: "space-between",
-                            marginBottom: 12,
+                          headerTitle={`Supported Banks (${ALLOWED_BANKS.length})`}
+                          clearLabel="Clear Bank"
+                          onClear={() => {
+                            setBankName("");
+                            setIsBankDropdownOpen(false);
                           }}
-                        >
-                          <View
-                            style={{
-                              flexDirection: "row",
-                              alignItems: "center",
-                              gap: 8,
-                              flex: 1,
-                            }}
-                          >
-                            <Text
-                              style={{
-                                fontSize: 14,
-                                color: bankName ? "#0f172a" : "#94a3b8",
-                                fontWeight: bankName ? "700" : "400",
-                              }}
-                              numberOfLines={1}
-                            >
-                              {bankName || "Select your bank..."}
-                            </Text>
-                          </View>
-                          <Text
-                            style={{
-                              fontSize: 14,
-                              color: "#64748b",
-                              fontWeight: "700",
-                            }}
-                          >
-                            {isBankDropdownOpen ? "▲" : "▼"}
-                          </Text>
-                        </Pressable>
-
-                        {/* Bank Dropdown Menu */}
-                        {isBankDropdownOpen && (
-                          <View
-                            style={{
-                              borderRadius: 14,
-                              borderWidth: 1.5,
-                              borderColor: "#cbd5e1",
-                              backgroundColor: "#fff",
-                              overflow: "hidden",
-                              marginBottom: 14,
-                              shadowColor: "#000",
-                              shadowOffset: { width: 0, height: 4 },
-                              shadowOpacity: 0.08,
-                              shadowRadius: 8,
-                              elevation: 4,
-                            }}
-                          >
-                            {ALLOWED_BANKS.map((b, idx) => {
-                              const isSelected = bankName === b;
-                              return (
-                                <Pressable
-                                  key={b}
-                                  onPress={() => {
-                                    setBankName(b);
-                                    setIsBankDropdownOpen(false);
-                                  }}
-                                  style={({ pressed }) => ({
-                                    paddingHorizontal: 16,
-                                    paddingVertical: 12,
-                                    flexDirection: "row",
-                                    alignItems: "center",
-                                    justifyContent: "space-between",
-                                    backgroundColor: isSelected
-                                      ? "#ecfdf5"
-                                      : pressed
-                                      ? "#f8fafc"
-                                      : "#fff",
-                                    borderBottomWidth:
-                                      idx < ALLOWED_BANKS.length - 1 ? 1 : 0,
-                                    borderBottomColor: "#f1f5f9",
-                                  })}
-                                >
-                                  <Text
-                                    style={{
-                                      fontSize: 14,
-                                      color: isSelected ? "#065f46" : "#334155",
-                                      fontWeight: isSelected ? "800" : "500",
-                                    }}
-                                  >
-                                    {b}
-                                  </Text>
-                                  {isSelected && (
-                                    <Text
-                                      style={{
-                                        color: "#059669",
-                                        fontWeight: "800",
-                                        fontSize: 12,
-                                      }}
-                                    >
-                                      Selected
-                                    </Text>
-                                  )}
-                                </Pressable>
-                              );
-                            })}
-                          </View>
-                        )}
+                        />
 
                         <Field
                           label="Account holder name"
@@ -836,203 +698,73 @@ export default function Profile() {
 
                 {/* ── INSURANCE SECTION ── */}
                 {(method === "insurance" || method === null) && (
-                  <View style={{ marginBottom: 16 }}>
-                    <Text
+                  <View
+                    style={{
+                      marginBottom: 16,
+                      backgroundColor: "#f8fafc",
+                      borderRadius: 16,
+                      padding: 16,
+                      borderWidth: 1.5,
+                      borderColor: method === "insurance" ? "#a7f3d0" : "#e2e8f0",
+                    }}
+                  >
+                    <View
                       style={{
-                        fontSize: 13,
-                        fontWeight: "700",
-                        color: "#374151",
-                        marginBottom: 6,
+                        flexDirection: "row",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                        marginBottom: 14,
                       }}
                     >
-                      Insurance provider
-                    </Text>
-
-                    {/* Dropdown Toggle Button */}
-                    <Pressable
-                      onPress={() => setIsInsuranceDropdownOpen((prev) => !prev)}
-                      style={({ pressed }) => ({
-                        height: 52,
-                        borderRadius: 14,
-                        borderWidth: 1.5,
-                        borderColor: isInsuranceDropdownOpen
-                          ? "#059669"
-                          : "#cbd5e1",
-                        backgroundColor: "#fff",
-                        paddingHorizontal: 16,
-                        flexDirection: "row",
-                        alignItems: "center",
-                        justifyContent: "space-between",
-                        opacity: pressed ? 0.9 : 1,
-                      })}
-                    >
+                      <Text
+                        style={{
+                          fontSize: 14,
+                          fontWeight: "800",
+                          color: "#0f172a",
+                        }}
+                      >
+                        Insurance Details
+                      </Text>
                       <View
                         style={{
-                          flexDirection: "row",
-                          alignItems: "center",
-                          gap: 8,
-                          flex: 1,
+                          backgroundColor: "#dcfce7",
+                          paddingHorizontal: 8,
+                          paddingVertical: 2,
+                          borderRadius: 8,
                         }}
                       >
                         <Text
                           style={{
-                            fontSize: 15,
-                            color: insurer ? "#0f172a" : "#94a3b8",
-                            fontWeight: insurer ? "700" : "400",
+                            fontSize: 11,
+                            color: "#15803d",
+                            fontWeight: "700",
                           }}
-                          numberOfLines={1}
                         >
-                          {insurer || "Select your insurance provider..."}
+                          COVER
                         </Text>
                       </View>
-                      <Text
-                        style={{
-                          fontSize: 14,
-                          color: "#64748b",
-                          fontWeight: "700",
-                        }}
-                      >
-                        {isInsuranceDropdownOpen ? "▲" : "▼"}
-                      </Text>
-                    </Pressable>
+                    </View>
 
-                    {/* Dropdown Options Menu */}
-                    {isInsuranceDropdownOpen && (
-                      <View
-                        style={{
-                          marginTop: 6,
-                          borderRadius: 14,
-                          borderWidth: 1.5,
-                          borderColor: "#cbd5e1",
-                          backgroundColor: "#fff",
-                          overflow: "hidden",
-                          shadowColor: "#000",
-                          shadowOffset: { width: 0, height: 4 },
-                          shadowOpacity: 0.08,
-                          shadowRadius: 10,
-                          elevation: 5,
-                        }}
-                      >
-                        <View
-                          style={{
-                            paddingHorizontal: 14,
-                            paddingVertical: 10,
-                            backgroundColor: "#f8fafc",
-                            borderBottomWidth: 1,
-                            borderBottomColor: "#f1f5f9",
-                          }}
-                        >
-                          <Text
-                            style={{
-                              fontSize: 12,
-                              fontWeight: "700",
-                              color: "#64748b",
-                              textTransform: "uppercase",
-                              letterSpacing: 0.5,
-                            }}
-                          >
-                            Accepted Insurance Partners (
-                            {allowedInsurers.length})
-                          </Text>
-                        </View>
+                    <StyledDropdown
+                      label="Insurance provider"
+                      placeholder="Select your insurance provider..."
+                      value={insurer}
+                      options={allowedInsurers}
+                      isOpen={isInsuranceDropdownOpen}
+                      onToggle={() => setIsInsuranceDropdownOpen((prev) => !prev)}
+                      onSelect={(item) => {
+                        setInsurer(item);
+                        setIsInsuranceDropdownOpen(false);
+                      }}
+                      headerTitle={`Accepted Insurance Partners (${allowedInsurers.length})`}
+                      clearLabel="Clear Provider"
+                      onClear={() => {
+                        setInsurer("");
+                        setIsInsuranceDropdownOpen(false);
+                      }}
+                    />
 
-                        {allowedInsurers.map((item, idx) => {
-                          const isSelected = insurer === item;
-                          return (
-                            <Pressable
-                              key={item}
-                              onPress={() => {
-                                setInsurer(item);
-                                setIsInsuranceDropdownOpen(false);
-                              }}
-                              style={({ pressed }) => ({
-                                paddingHorizontal: 16,
-                                paddingVertical: 13,
-                                flexDirection: "row",
-                                alignItems: "center",
-                                justifyContent: "space-between",
-                                backgroundColor: isSelected
-                                  ? "#ecfdf5"
-                                  : pressed
-                                  ? "#f8fafc"
-                                  : "#fff",
-                                borderBottomWidth:
-                                  idx < allowedInsurers.length - 1 ? 1 : 0,
-                                borderBottomColor: "#f1f5f9",
-                              })}
-                            >
-                              <View
-                                style={{
-                                  flexDirection: "row",
-                                  alignItems: "center",
-                                  gap: 10,
-                                }}
-                              >
-                                <View
-                                  style={{
-                                    width: 8,
-                                    height: 8,
-                                    borderRadius: 4,
-                                    backgroundColor: isSelected
-                                      ? "#059669"
-                                      : "#cbd5e1",
-                                  }}
-                                />
-                                <Text
-                                  style={{
-                                    fontSize: 14,
-                                    color: isSelected ? "#065f46" : "#334155",
-                                    fontWeight: isSelected ? "800" : "500",
-                                  }}
-                                >
-                                  {item}
-                                </Text>
-                              </View>
-                              {isSelected && (
-                                <Text
-                                  style={{
-                                    color: "#059669",
-                                    fontWeight: "800",
-                                    fontSize: 12,
-                                  }}
-                                >
-                                  Selected
-                                </Text>
-                              )}
-                            </Pressable>
-                          );
-                        })}
-
-                        {insurer ? (
-                          <Pressable
-                            onPress={() => {
-                              setInsurer("");
-                              setIsInsuranceDropdownOpen(false);
-                            }}
-                            style={{
-                              paddingHorizontal: 16,
-                              paddingVertical: 11,
-                              backgroundColor: "#fef2f2",
-                              borderTopWidth: 1,
-                              borderTopColor: "#fee2e2",
-                              alignItems: "center",
-                            }}
-                          >
-                            <Text
-                              style={{
-                                color: "#dc2626",
-                                fontSize: 13,
-                                fontWeight: "700",
-                              }}
-                            >
-                              Clear Provider
-                            </Text>
-                          </Pressable>
-                        ) : null}
-                      </View>
-                    )}
-
-                    <View style={{ marginTop: 12 }}>
+                    <View style={{ marginTop: 4 }}>
                       <Field
                         label="Member number"
                         autoCapitalize="characters"
@@ -1064,8 +796,7 @@ export default function Profile() {
                         textAlign: "center",
                       }}
                     >
-                      {feedback.type === "success" ? "✓ " : "✕ "}
-                      {feedback.msg}
+                      {feedback.type === "success" ? `✓ ${feedback.msg}` : feedback.msg}
                     </Text>
                   </View>
                 )}
@@ -1080,6 +811,121 @@ export default function Profile() {
               </>
             )}
           </Card>
+
+          {/* ── Saved Preferences List ── */}
+          {loaded && (
+            <Card className="mb-5 p-4">
+              <View
+                style={{
+                  flexDirection: "row",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  marginBottom: 10,
+                }}
+              >
+                <Text
+                  style={{
+                    fontSize: 16,
+                    fontWeight: "800",
+                    color: "#0f172a",
+                  }}
+                >
+                  Saved preferences
+                </Text>
+                {savedItems.length > 0 && (
+                  <View
+                    style={{
+                      backgroundColor: "#ecfdf5",
+                      paddingHorizontal: 10,
+                      paddingVertical: 3,
+                      borderRadius: 12,
+                      borderWidth: 1,
+                      borderColor: "#a7f3d0",
+                    }}
+                  >
+                    <Text
+                      style={{
+                        fontSize: 11,
+                        fontWeight: "700",
+                        color: "#047857",
+                      }}
+                    >
+                      {savedItems.length} saved
+                    </Text>
+                  </View>
+                )}
+              </View>
+
+              {savedItems.length === 0 ? (
+                <Text style={{ fontSize: 13, color: "#64748b" }}>
+                  No payment preferences saved yet. Configure an option above and tap Save preferences.
+                </Text>
+              ) : (
+                <View style={{ gap: 10 }}>
+                  {savedItems.map((item) => (
+                    <View
+                      key={item.key}
+                      style={{
+                        backgroundColor: "#f8fafc",
+                        borderRadius: 12,
+                        padding: 12,
+                        borderWidth: 1,
+                        borderColor: item.isDefault ? "#a7f3d0" : "#e2e8f0",
+                        flexDirection: "row",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        gap: 8,
+                      }}
+                    >
+                      <View style={{ flex: 1 }}>
+                        <Text
+                          style={{
+                            fontSize: 11,
+                            fontWeight: "700",
+                            color: "#64748b",
+                            textTransform: "uppercase",
+                            letterSpacing: 0.4,
+                          }}
+                        >
+                          {item.label}
+                        </Text>
+                        <Text
+                          style={{
+                            fontSize: 14,
+                            fontWeight: "700",
+                            color: "#0f172a",
+                            marginTop: 2,
+                          }}
+                        >
+                          {item.value}
+                        </Text>
+                      </View>
+                      {item.isDefault && (
+                        <View
+                          style={{
+                            backgroundColor: "#d1fae5",
+                            paddingHorizontal: 8,
+                            paddingVertical: 3,
+                            borderRadius: 8,
+                          }}
+                        >
+                          <Text
+                            style={{
+                              fontSize: 11,
+                              fontWeight: "800",
+                              color: "#065f46",
+                            }}
+                          >
+                            Default
+                          </Text>
+                        </View>
+                      )}
+                    </View>
+                  ))}
+                </View>
+              )}
+            </Card>
+          )}
 
           {/* ── Sign out ── */}
           <Card className="p-4">
